@@ -7,6 +7,9 @@ import (
 
 	csvtag "github.com/artonge/go-csv-tag/v2"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 )
 
 type FileRename struct {
@@ -31,10 +34,24 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		path := args[0]
 
+		f, err := os.Open(path)
+		if err != nil {
+			fmt.Printf("could not find csv: %s\n", path)
+			os.Exit(1)
+		}
+		r := transform.NewReader(f, charmap.ISO8859_1.NewDecoder())
+
 		var renames []FileRename
-		err := csvtag.LoadFromPath(path, &renames, csvtag.CsvOptions{Separator: ';'})
+		err = csvtag.LoadFromReader(r, &renames, csvtag.CsvOptions{Separator: rune(viper.GetString("seperator")[0])})
 		if err != nil {
 			fmt.Printf("error reading csv file %q: %s\n", path, err)
+		}
+
+		if viper.GetBool("verbose") {
+			fmt.Println("looking for these files:")
+			for _, r := range renames {
+				fmt.Println(r.From)
+			}
 		}
 
 		var rens []FileRename
@@ -42,22 +59,38 @@ var rootCmd = &cobra.Command{
 		count := 0
 		maxLen := 0
 		fmt.Printf("%d", count)
+		var finderrs []RenameErr
 		for _, fr := range renames {
 			fmt.Print(deleters(fmt.Sprintf("%d", count)))
 			_, err := os.Stat(fr.From)
-			if err == nil {
-				count++
-				if len(fr.From) > maxLen {
-					maxLen = len(fr.From)
-				}
-				rens = append(rens, fr)
+			if err != nil {
+				finderrs = append(finderrs, RenameErr{Fr: fr, err: err})
+
+				fmt.Printf("%d", count)
+				continue
 			}
+			count++
+			if len(fr.From) > maxLen {
+				maxLen = len(fr.From)
+			}
+			rens = append(rens, fr)
 
 			fmt.Printf("%d", count)
 		}
 		fmt.Println("")
 
+		if viper.GetBool("verbose") {
+			fmt.Println("Errors:")
+			for _, e := range finderrs {
+				fmt.Println(e.err)
+			}
+		}
+
 		fmt.Printf("found %d/%d files\n", count, len(renames))
+		if len(rens) == 0 {
+			fmt.Println("nothing to do")
+			os.Exit(0)
+		}
 		fmt.Printf("start renaming ? (y|N): ")
 		var y string
 		_, err = fmt.Scanln(&y)
@@ -89,7 +122,7 @@ var rootCmd = &cobra.Command{
 
 			fmt.Printf(RenFmt, count, len(rens), len(errs), pad(last, maxLen))
 		}
-		fmt.Println()
+		fmt.Println(deleters(pad(last, maxLen+2)))
 
 		for _, rerr := range errs {
 			fmt.Printf("%s\n", rerr.err)
@@ -124,4 +157,11 @@ func Execute() {
 		fmt.Printf("error running command: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "print more error messages")
+	rootCmd.PersistentFlags().StringP("seperator", "s", ";", "csv seperator")
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("seperator", rootCmd.PersistentFlags().Lookup("seperator"))
 }
