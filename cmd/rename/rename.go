@@ -1,4 +1,4 @@
-package cmd
+package rename
 
 import (
 	"fmt"
@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/transform"
+
+	"github.com/paradoxgery/batch-rename/utils"
 )
 
 type FileRename struct {
@@ -25,12 +27,12 @@ type RenameErr struct {
 const CountTxt = `counting files to rename: `
 const RenFmt = "renaming %d/%d (errors: %d): %s"
 
-var rootCmd = &cobra.Command{
-	Use:     "batch-rename",
+var RenameCmd = &cobra.Command{
+	Use:     "rename",
 	Short:   "renames files in batch",
 	Long:    "this command will read from a given *.csv with ; as seperator with 'Ur-Pfad+Ur-Datei;Zielpfad+Zieldatei' as header and rename all files listed in the csv\nif there are errors it will list all files that had errors",
 	Args:    cobra.ExactArgs(1),
-	Example: "batch-rename some.csv",
+	Example: "rename some.csv",
 	Run: func(cmd *cobra.Command, args []string) {
 		path := args[0]
 
@@ -61,7 +63,7 @@ var rootCmd = &cobra.Command{
 		fmt.Printf("%d", count)
 		var finderrs []RenameErr
 		for _, fr := range renames {
-			fmt.Print(deleters(fmt.Sprintf("%d", count)))
+			fmt.Print(utils.Deleters(fmt.Sprintf("%d", count)))
 			_, err := os.Stat(fr.From)
 			if err != nil {
 				finderrs = append(finderrs, RenameErr{Fr: fr, err: err})
@@ -102,16 +104,16 @@ var rootCmd = &cobra.Command{
 		count = 0
 		var errs []RenameErr
 		last := ""
-		fmt.Printf(RenFmt, count, len(rens), len(errs), pad(last, maxLen))
+		fmt.Printf(RenFmt, count, len(rens), len(errs), utils.Pad(last, maxLen))
 		for _, ren := range rens {
-			fmt.Print(deleters(fmt.Sprintf(RenFmt, count, len(rens), len(errs), pad(last, maxLen))))
+			fmt.Print(utils.Deleters(fmt.Sprintf(RenFmt, count, len(rens), len(errs), utils.Pad(last, maxLen))))
 			count++
 			last = ren.From
 
 			err := os.MkdirAll(filepath.Dir(ren.To), os.ModePerm)
 			if err != nil {
 				errs = append(errs, RenameErr{Fr: ren, err: err})
-				fmt.Printf(RenFmt, count, len(rens), len(errs), pad(last, maxLen))
+				fmt.Printf(RenFmt, count, len(rens), len(errs), utils.Pad(last, maxLen))
 				continue
 			}
 
@@ -120,9 +122,9 @@ var rootCmd = &cobra.Command{
 				errs = append(errs, RenameErr{Fr: ren, err: err})
 			}
 
-			fmt.Printf(RenFmt, count, len(rens), len(errs), pad(last, maxLen))
+			fmt.Printf(RenFmt, count, len(rens), len(errs), utils.Pad(last, maxLen))
 		}
-		fmt.Println(deleters(pad(last, maxLen+2)))
+		fmt.Println(utils.Deleters(utils.Pad(last, maxLen+2)))
 
 		for _, rerr := range errs {
 			fmt.Printf("%s\n", rerr.err)
@@ -130,38 +132,4 @@ var rootCmd = &cobra.Command{
 
 		fmt.Println("done")
 	},
-}
-
-func deleters(text string) string {
-	res := ""
-
-	for range text {
-		res += "\b"
-	}
-
-	return res
-}
-
-func pad(text string, l int) string {
-	res := text
-	for i := len(text); i < l; i++ {
-		res += " "
-	}
-
-	return res
-}
-
-// Execute is the entry to this command
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Printf("error running command: %s\n", err)
-		os.Exit(1)
-	}
-}
-
-func init() {
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "print more error messages")
-	rootCmd.PersistentFlags().StringP("seperator", "s", ";", "csv seperator")
-	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("seperator", rootCmd.PersistentFlags().Lookup("seperator"))
 }
