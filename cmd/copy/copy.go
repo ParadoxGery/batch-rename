@@ -2,8 +2,9 @@ package copy
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
+	"path/filepath"
 
 	csvtag "github.com/artonge/go-csv-tag/v2"
 	"github.com/spf13/cobra"
@@ -94,13 +95,13 @@ var CopyCmd = &cobra.Command{
 				continue
 			}
 
-			data, err := ioutil.ReadAll(f)
+			dst, err := os.Create(e.CopyPath + "/" + filepath.Base(e.Data))
 			if err != nil {
 				errors[e.Data] = err
 				continue
 			}
 
-			err = ioutil.WriteFile(e.CopyPath+f.Name(), data, 0644)
+			_, err = io.Copy(dst, f)
 			if err != nil {
 				errors[e.Data] = err
 				continue
