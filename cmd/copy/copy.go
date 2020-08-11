@@ -76,7 +76,7 @@ var CopyCmd = &cobra.Command{
 			os.Exit(0)
 		}
 
-		var errors map[string]error
+		errors := make(map[string]error)
 		for _, e := range existing {
 			err := os.MkdirAll(e.CopyPath, os.ModePerm)
 			if err != nil {
