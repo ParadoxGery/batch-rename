@@ -43,25 +43,28 @@ var CopyCmd = &cobra.Command{
 		var existing []FileMove
 		if viper.GetBool("verbose") {
 			fmt.Println("looking for these files:")
-			for _, r := range copies {
+		}
+		for _, r := range copies {
+			if viper.GetBool("verbose") {
 				fmt.Println(r.Data)
-
-				_, err := os.Stat(r.Data)
-				if err != nil {
-					missing = append(missing, r)
-					continue
-				}
-
-				existing = append(existing, r)
 			}
+			_, err := os.Stat(r.Data)
+			if err != nil {
+				missing = append(missing, r)
+				continue
+			}
+
+			existing = append(existing, r)
 		}
 
 		fmt.Printf("found [%d/%d] files\n", len(existing), len(copies))
 
-		if len(missing) > 0 {
-			fmt.Println("missing files:")
-			for _, m := range missing {
-				fmt.Printf("\t%s\n", m.Data)
+		if viper.GetBool("verbose") {
+			if len(missing) > 0 {
+				fmt.Println("missing files:")
+				for _, m := range missing {
+					fmt.Printf("\t%s\n", m.Data)
+				}
 			}
 		}
 
